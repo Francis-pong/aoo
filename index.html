@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TERMO-CORE :: Tactical Unit</title>
+    
+    <!-- Fuentes de Google -->
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Iconos Materiales -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <style>
+        /* =========================================
+           VARIABLES DE SISTEMA Y TEMAS
+           ========================================= */
+        :root {
+            /* Colores Base */
+            --bg-black: #050505;
+            --bg-panel: #111111;
+            --bg-active: #1a1a1a;
+            --border-color: #2a2a2a;
+            --text-main: #f0f0f0;
+            --text-muted: #777777;
+            
+            /* TEMA POR DEFECTO: CYAN (Hielo) */
+            --theme-primary: #00e5ff;
+            --theme-primary-glow: rgba(0, 229, 255, 0.2);
+            --theme-secondary: #ff3d00; /* Color para calefacción */
+            --theme-eco: #00e676; /* Color para ahorro */
+            
+            /* Fuentes */
+            --font-display: 'Oswald', sans-serif;
+            --font-mono: 'Roboto Mono', monospace;
+            
+            /* Animaciones */
+            --transition-fast: 0.2s ease;
+            --transition-smooth: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Variantes de Tema */
+        [data-theme="amber"] {
+            --theme-primary: #ffb300;
+            --theme-primary-glow: rgba(255, 179, 0, 0.2);
+        }
+
+        [data-theme="crimson"] {
+            --theme-primary: #ff1744;
+            --theme-primary-glow: rgba(255, 23, 68, 0.2);
+        }
+
+        /* =========================================
+           RESETEO Y CONTENEDOR PRINCIPAL
+           ========================================= */
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none; /* Evitar que el texto se seleccione al tocar rápido */
+        }
+
+        body {
+            background-color: #000;
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; width: 100vw;
+            overflow: hidden;
+        }
+
+        #app-container {
+            width: 100%; height: 100%;
+            max-width: 400px; max-height: 800px;
+            background-color: var(--bg-black);
+            display: flex; flex-direction: column;
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* Bordes redondeados solo en pantallas grandes (simulando celular) */
+        @media (min-width: 420px) {
+            #app-container {
+                border-radius: 2.5rem;
+                border: 2px solid var(--border-color);
+                height: 90vh;
+            }
+        }
+
+        /* Efecto Escáner */
+        #app-container::after {
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%);
+            background-size: 100% 4px; pointer-events: none; z-index: 999;
+        }
+
+        /* =========================================
+           BARRA SUPERIOR (HEADER)
+           ========================================= */
+        header {
+            padding: 20px 25px 10px 25px;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 10;
+        }
+
+        .sys-status {
+            display: flex; align-items: center; gap: 8px;
+            color: var(--theme-primary); font-weight: bold; font-size: 10px;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        .pulse-dot {
+            width: 8px; height: 8px; background-color: var(--theme-primary);
+            border-radius: 50%; box-shadow: 0 0 8px var(--theme-primary);
+            animation: pulse-anim 2s infinite;
+        }
+
+        @keyframes pulse-anim {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 15px var(--theme-primary); }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .telemetry-top {
+            display: flex; align-items: center; gap: 10px; color: var(--text-muted);
+        }
+
+        .batt-icon { transition: color var(--transition-smooth); }
+        .batt-critical { color: var(--theme-secondary) !important; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        /* =========================================
+           SISTEMA DE VISTAS (SPA)
+           ========================================= */
+        .view {
+            flex: 1; display: none; flex-direction: column;
+            padding: 15px 25px 90px 25px; overflow-y: auto;
+            animation: fadeIn var(--transition-smooth);
+        }
+
+        .view.active { display: flex; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Branding Títulos */
+        .brand { margin-bottom: 25px; }
+        .brand h1 { 
+            font-family: var(--font-display); font-size: 28px; font-weight: 900; 
+            font-style: italic; text-transform: uppercase; letter-spacing: -0.5px; 
+            line-height: 1.1;
+        }
+        .brand h1 span { color: var(--theme-primary); }
+        .brand p { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; }
+
+        /* =========================================
+           DASHBOARD: TELEMETRÍA CENTRAL
+           ========================================= */
+        .telemetry-ring-container {
+            position: relative; width: 250px; height: 250px;
+            margin: 0 auto 30px auto; display: flex; justify-content: center; align-items: center;
+        }
+
+        #svg-ring {
+            transform: rotate(-90deg); width: 100%; height: 100%;
+            filter: drop-shadow(0 0 10px var(--theme-primary-glow));
+        }
+
+        .ring-bg { fill: none; stroke: var(--bg-panel); stroke-width: 6; }
+        
+        .ring-progress {
+            fill: none; stroke-width: 10; stroke-linecap: round;
+            transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
+            /* El color y offset se manejan por JS */
+        }
+
+        .ring-data {
+            position: absolute; text-align: center; display: flex; flex-direction: column; align-items: center;
+        }
+
+        .data-label { font-size: 11px; color: var(--text-muted); font-weight: bold; letter-spacing: 1px; }
+        .data-value { font-family: var(--font-display); font-size: 65px; font-weight: 700; color: var(--text-main); line-height: 1; margin: 5px 0; }
+        .data-unit { font-size: 18px; color: var(--theme-primary); vertical-align: top; font-family: var(--font-mono); }
+
+        .status-badge {
+            background-color: var(--bg-active); border: 1px solid var(--border-color);
+            padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold;
+            display: inline-flex; align-items: center; gap: 5px; transition: all 0.3s ease;
+        }
+
+        /* =========================================
+           DASHBOARD: CONTROLES
+           ========================================= */
+        .control-panel {
+            background-color: var(--bg-panel); border: 1px solid var(--border-color);
+            border-radius: 1.2rem; padding: 20px; margin-bottom: 20px;
+        }
+
+        .panel-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; }
+        .panel-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        .panel-target { font-family: var(--font-display); font-size: 22px; font-weight: bold; color: var(--text-main); line-height: 1; }
+        .panel-target span { font-size: 14px; color: var(--theme-primary); }
+
+        /* Slider Personalizado */
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; background: transparent; outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px; background: var(--bg-active); border-radius: 3px; cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 24px; width: 24px; border-radius: 50%; background: var(--theme-primary);
+            cursor: pointer; -webkit-appearance: none; margin-top: -9px;
+            box-shadow: 0 0 15px var(--theme-primary-glow); transition: transform 0.1s;
+        }
+        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.3); }
+
+        .footer-info {
+            margin-top: auto; display: flex; justify-content: space-between;
+            font-size: 10px; color: var(--text-muted); border-t: 1px solid var(--border-color); padding-top: 12px;
+        }
+
+        /* =========================================
+           CONFIGURACIÓN (SETTINGS)
+           ========================================= */
+        .settings-group { margin-bottom: 30px; }
+        .group-title {
+            font-family: var(--font-display); font-size: 16px; color: var(--text-main);
+            text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;
+        }
+
+        .setting-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.02);
+        }
+
+        .setting-desc label { font-size: 13px; font-weight: bold; color: var(--text-main); display: block; margin-bottom: 2px; }
+        .setting-desc span { font-size: 11px; color: var(--text-muted); }
+
+        /* Selector de Tema */
+        .theme-options { display: flex; gap: 12px; }
+        .theme-btn {
+            width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+            border: 2px solid transparent; transition: var(--transition-fast);
+        }
+        .theme-btn.active { border-color: var(--text-main); transform: scale(1.15); }
+        .bg-cyan { background-color: #00e5ff; }
+        .bg-amber { background-color: #ffb300; }
+        .bg-crimson { background-color: #ff1744; }
+
+        /* Botones Acción */
+        .btn-action {
+            background-color: var(--bg-panel); border: 1px solid var(--border-color);
+            color: var(--theme-primary); font-family: var(--font-mono); font-size: 11px;
+            font-weight: bold; text-transform: uppercase; padding: 8px 16px;
+            border-radius: 6px; cursor: pointer; transition: var(--transition-fast);
+        }
+        .btn-action:active { transform: scale(0.95); background-color: var(--bg-active); }
+        .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* =========================================
+           NAVEGACIÓN INFERIOR
+           ========================================= */
+        #bottom-nav {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 75px;
+            background-color: rgba(5, 5, 5, 0.95); backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border-color);
+            display: flex; justify-content: space-evenly; align-items: center;
+            padding-bottom: env(safe-area-inset-bottom, 10px); /* Soporte para iPhone notch */
+            z-index: 50; 
+            border-radius: 0 0 2.5rem 2.5rem; /* Ajuste para bordes en PC */
+        }
+
+        @media (max-width: 420px) {
+            #bottom-nav { border-radius: 0; }
+        }
+
+        .nav-btn {
+            background: none; border: none; color: var(--text-muted);
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            cursor: pointer; transition: var(--transition-smooth);
+            flex: 1; max-width: 80px; /* Límite para evitar que se fusionen */
+            padding: 5px; border-radius: 12px;
+        }
+
+        .nav-btn.active { color: var(--theme-primary); transform: translateY(-2px); }
+        .nav-btn .material-icons { font-size: 26px; }
+        .nav-btn span { font-size: 10px; font-weight: bold; text-transform: uppercase; font-family: var(--font-mono); }
+
+        /* =========================================
+           ASISTENTE IA (GEMINI)
+           ========================================= */
+        .ai-panel {
+            background-color: var(--bg-panel); border: 1px solid var(--theme-primary-glow);
+            border-radius: 1.2rem; padding: 20px; margin-bottom: 20px;
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.05);
+        }
+        
+        .ai-input {
+            width: 100%; background: var(--bg-active); border: 1px solid var(--border-color);
+            color: var(--text-main); font-family: var(--font-mono); font-size: 12px;
+            padding: 12px; border-radius: 8px; margin-bottom: 15px; resize: none;
+            outline: none; transition: var(--transition-fast);
+        }
+        
+        .ai-input:focus { border-color: var(--theme-primary); }
+
+        /* Botón de Micrófono para Voz */
+        .mic-btn {
+            position: absolute; bottom: 25px; right: 10px;
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            color: var(--text-muted); border-radius: 50%; width: 36px; height: 36px;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+            transition: var(--transition-fast); z-index: 5;
+        }
+        
+        .mic-btn.listening {
+            background: var(--theme-primary); color: var(--bg-black);
+            border-color: var(--theme-primary);
+            animation: pulse-anim 1.5s infinite;
+        }
+
+        .btn-sparkle {
+            background: linear-gradient(45deg, var(--bg-panel), var(--bg-active));
+            border: 1px solid var(--theme-primary); color: var(--theme-primary);
+            width: 100%; padding: 12px; border-radius: 8px; font-weight: bold;
+            text-transform: uppercase; font-family: var(--font-mono); font-size: 12px;
+            cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px;
+            transition: var(--transition-fast);
+        }
+
+        .btn-sparkle:active { transform: scale(0.98); }
+        .btn-sparkle:disabled { opacity: 0.5; cursor: not-allowed; border-color: var(--border-color); color: var(--text-muted); }
+
+        .ai-result-box {
+            margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--border-color);
+            display: none; flex-direction: column; gap: 15px; animation: fadeIn var(--transition-smooth);
+        }
+
+        .ai-temp-display {
+            text-align: center; font-family: var(--font-display); font-size: 40px;
+            color: var(--theme-primary); line-height: 1;
+        }
+        
+        .ai-analysis {
+            font-size: 11px; color: var(--text-muted); text-align: justify; line-height: 1.4;
+        }
+
+    </style>
+</head>
+<body data-theme="cyan">
+
+    <div id="app-container">
+        
+        <!-- HEADER -->
+        <header>
+            <div class="sys-status">
+                <div class="pulse-dot"></div>
+                <span id="status-text">Enlace Activo</span>
+            </div>
+            <div class="telemetry-top">
+                <span class="material-icons batt-icon" id="ui-batt-icon">battery_full</span>
+                <span id="ui-batt-level" style="font-size: 12px; font-weight: bold;">100%</span>
+                <span class="material-icons" style="font-size: 16px;">bluetooth_connected</span>
+            </div>
+        </header>
+
+        <!-- VISTA 1: DASHBOARD -->
+        <div id="view-dashboard" class="view active">
+            <div class="brand">
+                <h1>TERMO-<span>CORE</span></h1>
+                <p>Personal HVAC System</p>
+            </div>
+
+            <!-- Anillo Telemetría -->
+            <div class="telemetry-ring-container">
+                <svg id="svg-ring" viewBox="0 0 220 220">
+                    <circle class="ring-bg" cx="110" cy="110" r="100"></circle>
+                    <circle class="ring-progress" id="ring-progress" cx="110" cy="110" r="100"></circle>
+                </svg>
+                <div class="ring-data">
+                    <span class="data-label">TEMP PIEL</span>
+                    <div class="data-value" id="ui-skin-temp">34.5</div>
+                    <div class="status-badge" id="ui-system-mode">
+                        <span class="material-icons" id="ui-mode-icon" style="font-size: 14px;">ac_unit</span>
+                        <span id="ui-mode-text">INICIANDO</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel de Control -->
+            <div class="control-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Objetivo Térmico</span>
+                    <div class="panel-target" id="ui-target-temp">22<span>°C</span></div>
+                </div>
+                <input type="range" id="slider-target" min="16" max="32" value="22" step="1">
+            </div>
+
+            <div class="footer-info">
+                <span>ONAPI Pending | Ing. Loyola</span>
+                <span style="color:var(--theme-primary); font-weight:bold;">Obj: Silverado '26</span>
+            </div>
+        </div>
+
+        <!-- VISTA 2: CONFIGURACIÓN -->
+        <div id="view-settings" class="view">
+            <div class="brand">
+                <h1>SYS_<span>CONFIG</span></h1>
+                <p>Hardware & Preferencias</p>
+            </div>
+
+            <div class="settings-group">
+                <h2 class="group-title">Interfaz Ocular</h2>
+                <div class="setting-row">
+                    <div class="setting-desc">
+                        <label>Espectro Térmico</label>
+                        <span>Ajuste de visibilidad HUD</span>
+                    </div>
+                    <div class="theme-options">
+                        <div class="theme-btn bg-cyan active" data-color="cyan"></div>
+                        <div class="theme-btn bg-amber" data-color="amber"></div>
+                        <div class="theme-btn bg-crimson" data-color="crimson"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h2 class="group-title">Mantenimiento Peltier</h2>
+                <div class="setting-row">
+                    <div class="setting-desc">
+                        <label>Firmware Algoritmo</label>
+                        <span>Versión actual: V4.0.1</span>
+                    </div>
+                    <button class="btn-action" id="btn-update">Actualizar OTA</button>
+                </div>
+                <div class="setting-row">
+                    <div class="setting-desc">
+                        <label>Purgar Circuito</label>
+                        <span>Micro-convección líquida</span>
+                    </div>
+                    <button class="btn-action" id="btn-purge">Iniciar Ciclo</button>
+                </div>
+            </div>
+            
+            <div class="settings-group">
+                <h2 class="group-title">Conectividad</h2>
+                <div class="setting-row">
+                    <div class="setting-desc">
+                        <label>Arduino Nano BLE</label>
+                        <span>Latencia: 12ms (Óptima)</span>
+                    </div>
+                    <button class="btn-action" style="color: var(--theme-secondary); border-color: var(--border-color);">Desvincular</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 3: ASISTENTE IA -->
+        <div id="view-ai" class="view">
+            <div class="brand">
+                <h1>TERMO-<span>IA ✨</span></h1>
+                <p>Análisis de Entorno Adaptativo</p>
+            </div>
+
+            <div class="ai-panel">
+                <div class="panel-header">
+                    <span class="panel-title">Parámetros del Entorno</span>
+                </div>
+                <div style="position: relative;">
+                    <textarea id="ai-env-input" class="ai-input" rows="3" placeholder="Ej: Corriendo maratón bajo el sol caribeño a 35°C..."></textarea>
+                    <button id="btn-mic" class="mic-btn" title="Dictar por voz">
+                        <span class="material-icons" style="font-size: 20px;">mic</span>
+                    </button>
+                </div>
+                
+                <button id="btn-analyze-env" class="btn-sparkle">
+                    <span class="material-icons" style="font-size: 16px;">auto_awesome</span>
+                    Generar Perfil Térmico
+                </button>
+
+                <div id="ai-result-box" class="ai-result-box">
+                    <div>
+                        <span class="panel-title" style="display:block; text-align:center; margin-bottom:5px;">Objetivo Sugerido</span>
+                        <div class="ai-temp-display" id="ai-temp-val">--<span>°C</span></div>
+                    </div>
+                    <div class="ai-analysis" id="ai-analysis-text">
+                        Esperando datos de telemetría...
+                    </div>
+                    <button id="btn-apply-ai" class="btn-action" style="width: 100%; text-align: center;">Aplicar al Sistema Central</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- NAVEGACIÓN -->
+        <nav id="bottom-nav">
+            <button class="nav-btn active" data-target="dashboard">
+                <span class="material-icons">data_usage</span>
+                <span>Telemetría</span>
+            </button>
+            <button class="nav-btn" data-target="ai">
+                <span class="material-icons">auto_awesome</span>
+                <span>IA Core ✨</span>
+            </button>
+            <button class="nav-btn" data-target="settings">
+                <span class="material-icons">memory</span>
+                <span>Sistema</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <!-- SCRIPT DE LÓGICA -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- 0. FUNCIONES TÁCTICAS (EXTRAS) ---
+            // Respuesta Háptica (Vibración) para simular hardware real
+            const triggerHaptic = (duration = 40) => {
+                if ('vibrate' in navigator) {
+                    navigator.vibrate(duration);
+                }
+            };
+
+            // --- 1. NAVEGACIÓN SPA ---
+            const navBtns = document.querySelectorAll('.nav-btn');
+            const views = document.querySelectorAll('.view');
+
+            navBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    triggerHaptic(30); // Vibración ligera al cambiar de pestaña
+                    navBtns.forEach(b => b.classList.remove('active'));
+                    views.forEach(v => v.classList.remove('active'));
+                    
+                    btn.classList.add('active');
+                    document.getElementById(`view-${btn.dataset.target}`).classList.add('active');
+                });
+            });
+
+            // --- 2. CONFIGURACIÓN DEL ANILLO SVG (Matemática Exacta) ---
+            const ringProgress = document.getElementById('ring-progress');
+            const radius = ringProgress.r.baseVal.value; // Obtiene el radio (100)
+            const circumference = 2 * Math.PI * radius; // ~628.318
+            
+            // Inicializar el anillo para que soporte el dashoffset correctamente
+            ringProgress.style.strokeDasharray = `${circumference} ${circumference}`;
+            ringProgress.style.strokeDashoffset = circumference; // Empieza vacío (0%)
+
+            // --- 3. LÓGICA DE CONTROL TÉRMICO Y EFICIENCIA ---
+            const slider = document.getElementById('slider-target');
+            const targetUI = document.getElementById('ui-target-temp');
+            const skinUI = document.getElementById('ui-skin-temp');
+            const modeTextUI = document.getElementById('ui-mode-text');
+            const modeIconUI = document.getElementById('ui-mode-icon');
+            const badgeUI = document.getElementById('ui-system-mode');
+
+            // Variables de estado simuladas (Aquí entrarían los datos reales del Arduino)
+            let currentTarget = parseInt(slider.value);
+            let simulatedSkinTemp = 34.5;
+            let batteryLevel = 100;
+
+            // Función principal que calcula la potencia PWM basada en la diferencia de temperatura
+            function calculateThermalLogic() {
+                // Obtener colores base del CSS usando getComputedStyle en el root
+                const rootStyles = getComputedStyle(document.body);
+                const colorCool = rootStyles.getPropertyValue('--theme-primary').trim();
+                const colorHeat = rootStyles.getPropertyValue('--theme-secondary').trim();
+                const colorEco = rootStyles.getPropertyValue('--theme-eco').trim();
+
+                const tempDifference = simulatedSkinTemp - currentTarget;
+                let powerPWM = 0; // Porcentaje de carga de la Peltier (0 a 100%)
+
+                if (tempDifference > 0.5) {
+                    // MODO ENFRIAMIENTO (Piel muy caliente)
+                    powerPWM = Math.min(Math.abs(tempDifference) * 20, 100); 
+                    
+                    modeTextUI.textContent = `ENFRIANDO ${Math.round(powerPWM)}%`;
+                    modeIconUI.textContent = 'ac_unit';
+                    
+                    ringProgress.style.stroke = colorCool;
+                    badgeUI.style.color = colorCool;
+                    badgeUI.style.borderColor = colorCool;
+
+                } else if (tempDifference < -0.5) {
+                    // MODO CALEFACCIÓN (Piel muy fría, invertir polaridad)
+                    powerPWM = Math.min(Math.abs(tempDifference) * 20, 100);
+                    
+                    modeTextUI.textContent = `CALENTANDO ${Math.round(powerPWM)}%`;
+                    modeIconUI.textContent = 'local_fire_department';
+                    
+                    ringProgress.style.stroke = colorHeat;
+                    badgeUI.style.color = colorHeat;
+                    badgeUI.style.borderColor = colorHeat;
+
+                } else {
+                    // MODO ECO (Temperatura estable, mínima potencia para mantener)
+                    powerPWM = 5; 
+                    
+                    modeTextUI.textContent = 'MODO ESTABLE ECO';
+                    modeIconUI.textContent = 'eco';
+                    
+                    ringProgress.style.stroke = colorEco;
+                    badgeUI.style.color = colorEco;
+                    badgeUI.style.borderColor = colorEco;
+                }
+
+                // Aplicar el cálculo al anillo visual (Carga PWM)
+                // Si powerPWM es 100, el offset es 0 (Anillo lleno)
+                const offset = circumference - (powerPWM / 100) * circumference;
+                ringProgress.style.strokeDashoffset = offset;
+            }
+
+            // Evento cuando el usuario mueve el slider
+            slider.addEventListener('input', (e) => {
+                currentTarget = parseInt(e.target.value);
+                targetUI.innerHTML = `${currentTarget}<span>°C</span>`;
+                calculateThermalLogic(); // Recalcular inmediatamente
+                triggerHaptic(15); // Vibración muy corta al deslizar (efecto rueda dentada)
+            });
+
+            // --- 4. MOTOR DE SIMULACIÓN EN TIEMPO REAL ---
+            // Simula la lectura del sensor de piel y consumo de batería cada 1.5s
+            setInterval(() => {
+                // 1. Variación sutil de la temperatura de la piel (+/- 0.1 grados)
+                const fluctuation = (Math.random() - 0.5) * 0.2;
+                simulatedSkinTemp += fluctuation;
+                
+                // Si la Peltier está a tope, forzar que la temp de la piel se acerque al objetivo
+                if (simulatedSkinTemp > currentTarget + 0.5) simulatedSkinTemp -= 0.1;
+                if (simulatedSkinTemp < currentTarget - 0.5) simulatedSkinTemp += 0.1;
+
+                skinUI.textContent = simulatedSkinTemp.toFixed(1);
+
+                // 2. Simulación de drenaje de batería (Drena más rápido si la dif. de temp es alta)
+                if (batteryLevel > 1 && Math.random() > 0.7) {
+                    batteryLevel -= 1;
+                    document.getElementById('ui-batt-level').textContent = `${batteryLevel}%`;
+                    
+                    const battIcon = document.getElementById('ui-batt-icon');
+                    if (batteryLevel <= 20) {
+                        battIcon.textContent = 'battery_alert';
+                        battIcon.classList.add('batt-critical');
+                    } else if (batteryLevel <= 50) {
+                        battIcon.textContent = 'battery_std';
+                    }
+                }
+
+                // 3. Ejecutar algoritmo de control térmico
+                calculateThermalLogic();
+
+            }, 1500);
+
+            // --- 5. LÓGICA DE PREFERENCIAS (Temas) ---
+            const themeBtns = document.querySelectorAll('.theme-btn');
+            themeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    themeBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    const newTheme = btn.dataset.color;
+                    document.body.setAttribute('data-theme', newTheme);
+                    
+                    // Forzar recálculo para actualizar colores
+                    calculateThermalLogic();
+                });
+            });
+
+            // --- 6. BOTONES DE ACCIÓN (Simulación de procesos) ---
+            const btnUpdate = document.getElementById('btn-update');
+            btnUpdate.addEventListener('click', function() {
+                triggerHaptic([30, 50, 30]); // Patrón de vibración
+                const originalText = this.textContent;
+                this.textContent = "Sincronizando...";
+                this.disabled = true;
+                
+                setTimeout(() => {
+                    this.textContent = "Firmware Actualizado";
+                    this.style.color = "var(--theme-eco)";
+                    setTimeout(() => {
+                        this.textContent = originalText;
+                        this.style.color = "";
+                        this.disabled = false;
+                    }, 3000);
+                }, 2000);
+            });
+
+            const btnPurge = document.getElementById('btn-purge');
+            btnPurge.addEventListener('click', function() {
+                triggerHaptic([50, 100, 50]);
+                this.textContent = "Purgando Bombas...";
+                this.disabled = true;
+                setTimeout(() => {
+                    this.textContent = "Circuito Limpio";
+                    this.style.color = "var(--theme-eco)";
+                    setTimeout(() => {
+                        this.textContent = "Iniciar Ciclo";
+                        this.style.color = "";
+                        this.disabled = false;
+                    }, 2000);
+                }, 2500);
+            });
+
+            // --- 7. INTEGRACIÓN GEMINI API (ASISTENTE IA) ---
+            const apiKey = ""; // La clave de la API es provista en tiempo de ejecución
+            const aiInput = document.getElementById('ai-env-input');
+            const btnAnalyze = document.getElementById('btn-analyze-env');
+            const resultBox = document.getElementById('ai-result-box');
+            const aiTempVal = document.getElementById('ai-temp-val');
+            const aiAnalysisText = document.getElementById('ai-analysis-text');
+            const btnApplyAi = document.getElementById('btn-apply-ai');
+
+            let suggestedAiTemp = 22;
+
+            async function callGeminiAPI(environmentText, retries = 5) {
+                // Endpoint usando gemini-2.5-flash
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                
+                // Configurando el System Prompt para forzar un esquema JSON
+                const payload = {
+                    contents: [{ parts: [{ text: `Entorno del usuario: "${environmentText}"` }] }],
+                    systemInstruction: { 
+                        parts: [{ 
+                            text: "Eres el núcleo de inteligencia artificial táctica TERMO-CORE. Tu trabajo es analizar el entorno o actividad que describe el usuario y recomendar una temperatura objetivo IDEAL para su traje/dispositivo de climatización corporal (Peltier). Debes devolver un objeto JSON estricto con dos propiedades: 'temperatura' (un número entero entre 16 y 32, que represente los grados Celsius ideales), y 'analisis' (una cadena de texto corta, máximo 2 oraciones, explicando táctica o fisiológicamente por qué elegiste esa temperatura para esa situación específica)."
+                        }] 
+                    },
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                temperatura: { type: "INTEGER" },
+                                analisis: { type: "STRING" }
+                            },
+                            required: ["temperatura", "analisis"]
+                        }
+                    }
+                };
+
+                // Backoff exponencial para resiliencia en red
+                const delays = [1000, 2000, 4000, 8000, 16000];
+                
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        
+                        const data = await response.json();
+                        const textResult = data.candidates[0].content.parts[0].text;
+                        return JSON.parse(textResult);
+
+                    } catch (error) {
+                        if (i === retries - 1) throw error;
+                        await new Promise(res => setTimeout(res, delays[i]));
+                    }
+                }
+            }
+
+            btnAnalyze.addEventListener('click', async () => {
+                const envText = aiInput.value.trim();
+                if (!envText) return;
+
+                triggerHaptic(40);
+                // Estado de "Cargando"
+                btnAnalyze.disabled = true;
+                btnAnalyze.innerHTML = '<span class="material-icons pulse-dot" style="margin-right:8px; width:6px; height:6px; box-shadow:none;"></span> Analizando...';
+                resultBox.style.display = 'none';
+
+                try {
+                    const aiData = await callGeminiAPI(envText);
+                    
+                    suggestedAiTemp = aiData.temperatura;
+                    
+                    // Asegurar límites térmicos de seguridad para el hardware
+                    if(suggestedAiTemp < 16) suggestedAiTemp = 16;
+                    if(suggestedAiTemp > 32) suggestedAiTemp = 32;
+
+                    // Actualizar Interfaz de la IA
+                    aiTempVal.innerHTML = `${suggestedAiTemp}<span>°C</span>`;
+                    aiAnalysisText.textContent = aiData.analisis;
+                    
+                    resultBox.style.display = 'flex';
+                    triggerHaptic([100, 50, 100]); // Vibración de éxito "Ta-da"
+                } catch (error) {
+                    aiAnalysisText.textContent = "Error de enlace con satélite (API). Reintente más tarde.";
+                    resultBox.style.display = 'flex';
+                    btnApplyAi.style.display = 'none';
+                } finally {
+                    btnAnalyze.disabled = false;
+                    btnAnalyze.innerHTML = '<span class="material-icons" style="font-size: 16px;">auto_awesome</span> Generar Perfil Térmico';
+                }
+            });
+
+            btnApplyAi.addEventListener('click', () => {
+                triggerHaptic(50);
+                // Aplicar la recomendación al sistema principal
+                currentTarget = suggestedAiTemp;
+                slider.value = currentTarget;
+                targetUI.innerHTML = `${currentTarget}<span>°C</span>`;
+                calculateThermalLogic();
+                
+                // Redirigir de vuelta al Dashboard para ver los cambios
+                document.querySelector('.nav-btn[data-target="dashboard"]').click();
+            });
+
+            // --- 8. RECONOCIMIENTO DE VOZ (SPEECH-TO-TEXT) ---
+            const btnMic = document.getElementById('btn-mic');
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (SpeechRecognition) {
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'es-DO'; // Configurado para español dominicano
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+
+                btnMic.addEventListener('click', () => {
+                    triggerHaptic(40);
+                    try {
+                        recognition.start();
+                        btnMic.classList.add('listening');
+                        aiInput.placeholder = "Escuchando... Habla ahora.";
+                    } catch(e) {
+                        // Si ya estaba escuchando, lo detiene
+                        recognition.stop();
+                    }
+                });
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    aiInput.value = transcript;
+                    triggerHaptic(30);
+                };
+
+                recognition.onend = () => {
+                    btnMic.classList.remove('listening');
+                    aiInput.placeholder = "Ej: Corriendo maratón bajo el sol caribeño a 35°C...";
+                };
+
+                recognition.onerror = (event) => {
+                    btnMic.classList.remove('listening');
+                    aiInput.placeholder = "Error al escuchar. Escribe manualmente.";
+                };
+            } else {
+                // Ocultar el botón si el navegador no soporta voz
+                btnMic.style.display = 'none';
+            }
+
+            // Ejecución inicial para setear valores
+            calculateThermalLogic();
+        });
+    </script>
+</body>
+</html>
